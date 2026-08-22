@@ -1,0 +1,11 @@
+name = "daily-english-picture-speaking-checkin"
+main = "index.js"
+compatibility_date = "2026-08-22"
+workers_dev = true
+
+# Configure secrets instead of placing them here:
+# npx wrangler secret put WXPUSHER_APP_TOKEN
+# npx wrangler secret put WXPUSHER_APP_ID
+# npx wrangler secret put UPSTASH_REDIS_REST_URL
+# npx wrangler secret put UPSTASH_REDIS_REST_TOKEN
+# npx wrangler secret put WEBHOOK_TOKEN

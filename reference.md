@@ -1,39 +1,28 @@
-# 技术选型与依赖说明
+# v2.0 技术选型
 
-## Python 3.12
+## GitHub Actions + Python
 
-使用标准库处理随机路由、环境变量与日志，使用 `requests` 处理 HTTP 请求，保持部署简洁。
+模块 A 是无状态的每日任务，GitHub Actions 免费额度足以承载。Cron 使用 UTC，`0 0 * * *` 对应北京时间 08:00。Python 仅依赖 `requests`，降低运行和维护复杂度。
 
-## GitHub Actions
+## Lorem Picsum + Pollinations.ai
 
-任务无状态且每天仅执行一次，适合由 GitHub Actions 承载；GitHub Secrets 用于安全注入密钥。
+Lorem Picsum 提供无需密钥的真实照片占位服务，适合每日随机图。Pollinations.ai 使用文本提示词生成 AI 图片。两者均可按 URL 获取图片，便于直接交给 WxPusher 渲染。
 
-Cron 按 UTC 解释：`0 0 * * *` 等于 UTC 00:00，即 Asia/Shanghai 08:00。中国标准时间没有夏令时。
+## Cloudflare Workers
 
-## Pexels
+模块 B 只在收到回调时执行，无需常驻服务器。Worker 使用原生 `fetch`，没有 npm 运行时依赖；Cloudflare 免费套餐适用于这一低频 Webhook 场景。`wrangler.toml` 中必须指定 Worker 名称、入口和兼容日期。
 
-使用 `GET https://api.pexels.com/v1/search` 搜索真实图片，并以 `Authorization: <API_KEY>` 鉴权。代码从返回的 `photos[*].src.large2x` 等字段中随机选图。
+## Upstash Redis
 
-Pexels 官方建议在可行时提供摄影师署名和来源链接。微信推送受“零文字”产品约束而不展示；若未来增加展示页，应在该页面补充来源与署名。
-
-- [Pexels API Documentation](https://www.pexels.com/api/documentation/)
-- [Pexels API 使用规范](https://www.pexels.com/api/documentation/#guidelines)
-
-## Pollinations.ai
-
-将随机生成的英文奇幻场景 prompt URL 编码，调用 URL 型图片生成接口。默认地址为：
-
-```text
-GET https://image.pollinations.ai/prompt/{url_encoded_prompt}
-```
-
-Pollinations 的模型、限流和鉴权策略可能更新；必要时配置 `POLLINATIONS_API_KEY` 或用 `POLLINATIONS_BASE_URL` 切换到官方当前端点。
-
-- [Pollinations 官方文档](https://gen.pollinations.ai/docs)
-- [Pollinations API 文档](https://github.com/pollinations/pollinations/blob/main/APIDOCS.md)
+Upstash Redis 提供 HTTP REST 接口，非常适合 Worker。每个用户只保存一个 JSON 字符串，键为 `checkin:{UID}`，无需数据库连接池或服务器。
 
 ## WxPusher
 
-调用 `POST https://wxpusher.zjiecode.com/api/send/message` 投递 HTML 类型消息（`contentType: 2`），正文仅使用 `<img>` 标签，以实现零文字图片消息。
+WxPusher 同时提供下行消息和上行指令回调：模块 A 用它送图，模块 B 以其 `send_up_cmd` 回调接收“打卡”并回复结果。
 
-- [WxPusher 官方文档仓库](https://github.com/wxpusher/wxpusher-docs)
+参考：
+
+- [GitHub Actions schedule](https://docs.github.com/actions/using-workflows/events-that-trigger-workflows#schedule)
+- [Cloudflare Worker configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
+- [Upstash Redis REST API](https://upstash.com/docs/redis/features/restapi)
+- [WxPusher 官方文档](https://github.com/wxpusher/wxpusher-docs)

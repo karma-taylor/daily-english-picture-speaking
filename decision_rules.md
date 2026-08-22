@@ -1,64 +1,36 @@
-# 业务决策与降级规则
+# v2.0 决策规则
 
-## 正常路径
+## 模块 A：随机推送
 
-```text
-开始
-  |
-  v
-读取 Secrets 配置
-  |
-  v
-random.random() < 0.5 ?
-  |                      |
- 是                     否
-  |                      |
-  v                      v
-Pexels 真实图片       Pollinations AI 图片
-  |                      |
-  +------ 成功 ----------+
-             |
-             v
-      WxPusher 只推送图片
-             |
-             v
-            结束
-```
+`random.random() < 0.5` 时优先调用 Lorem Picsum，否则优先调用 Pollinations.ai。主来源请求超时、返回非 2xx 或非图片内容时，立即尝试另一个来源；两个来源均失败时，工作流失败且不发送文本替代品。
 
-## 50% 路由规则
+## 模块 B：打卡日期判断
 
-```python
-primary_source = "pexels" if random.random() < 0.5 else "pollinations"
-```
+### 时区
 
-`random.random()` 均匀返回 `[0.0, 1.0)`，两个来源各有约 50% 的主路线概率。
+所有打卡日期统一以 `Asia/Shanghai` 计算，格式固定为 `YYYY-MM-DD`。Worker 不能使用 UTC 日期替代北京时间，否则北京时间凌晨可能被错误归入前一天。
 
-## Fallback 规则
+### 判断流程
 
 ```text
-主来源获取失败
-  |
-  v
-尝试另一个来源
-  |
-  +-- 成功 --> 推送图片
-  |
-  v
-两个远程来源均失败
-  |
-  v
-从 FALLBACK_IMAGE_URLS 随机取一张公网默认图片
-  |
-  +-- 已配置 --> 推送图片
-  |
-  v
-未配置 --> 工作流失败；不推送任何文字
+收到 POST 回调
+  -> 校验 webhook token、action、appId 和“打卡”关键词
+  -> 计算 today（北京时间）和 yesterday（北京时间）
+  -> 读取 checkin:{UID}
+     -> last_checkin == today：回复“今天已经打过卡了”
+     -> last_checkin == yesterday：streak = 旧 streak + 1
+     -> 其他情况或无记录：streak = 1
+  -> SET 新 {last_checkin: today, streak}
+  -> WxPusher 回复连续练习天数
 ```
 
-## 异常处理原则
+### 跨天与断签示例
 
-- 缺少 Pexels Token、HTTP 非 2xx、返回无图片或超时，均视为 Pexels 失败。
-- Pollinations 超时、HTTP 非 2xx 或返回非图片内容，均视为 AI 图片失败。
-- WxPusher HTTP 或业务失败码会使工作流失败，便于排查。
-- 降级过程不改变“零文字推送”规则。
-- `assets/` 的本地文件必须被部署到公网；GitHub Runner 本地路径不能被微信客户端读取。
+| 上次打卡 | 今天 | 结果 |
+| --- | --- | --- |
+| `2026-08-22` | `2026-08-22` | 不写 Redis；回复今天已打卡 |
+| `2026-08-21` | `2026-08-22` | 连续天数加 1 |
+| `2026-08-20` 或更早 | `2026-08-22` | 已断签，连续天数重置为 1 |
+| 无记录 | 任意日期 | 首次打卡，连续天数为 1 |
+
+打卡记录必须在成功写入 Upstash 后才能回复“打卡成功”；任一外部请求失败时返回 HTTP 500，让 WxPusher 根据其策略重试或供日志排查。

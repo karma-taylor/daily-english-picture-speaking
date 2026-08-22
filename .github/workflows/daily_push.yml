@@ -33,11 +33,9 @@ jobs:
         env:
           WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
           WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
-          FALLBACK_IMAGE_URLS: ${{ secrets.FALLBACK_IMAGE_URLS }}
           POLLINATIONS_BASE_URL: ${{ vars.POLLINATIONS_BASE_URL }}
           IMAGE_WIDTH: "1024"
           IMAGE_HEIGHT: "1024"
           LOG_LEVEL: INFO
-        run: python scripts/main.py
+        run: python scripts/daily_push.py

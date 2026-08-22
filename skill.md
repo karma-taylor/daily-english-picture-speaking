@@ -1,64 +1,58 @@
-# 每日 5 分钟英语看图演讲
+# 每日 5 分钟英语看图演讲 · v2.0
 
-## 产品目标
+## 产品说明
 
-每天北京时间 08:00，自动向用户微信发送一张图片，不附带题目、提示词、说明文字或翻译。用户面对图片进行 5 分钟英文口语练习。
+v2.0 在每日看图推送的基础上增加轻量级打卡。用户每天收到一张图片后，完成 5 分钟英语演讲，并在 WxPusher 中回复“打卡”。系统记录连续练习天数并自动回复结果。
 
-## 用户使用流程
+## 核心交互闭环
 
-1. 创建 Pexels API Key 与 WxPusher 应用。
-2. 在 GitHub 仓库 Secrets 配置必要密钥。
-3. 关注或绑定 WxPusher，并取得自己的 UID。
-4. GitHub Actions 每日北京时间 08:00 自动运行。
-5. 用户仅收到一张图片，开始 5 分钟无字英语演讲。
+1. 每天北京时间 08:00，GitHub Actions 触发模块 A。
+2. 模块 A 以 50% 概率从 Lorem Picsum 获取真实图片，或以 50% 概率从 Pollinations.ai 获取 AI 图片。
+3. 模块 A 通过 WxPusher 向用户发送纯图片。
+4. 用户完成练习后回复“打卡”。
+5. WxPusher 将上行消息 POST 到模块 B 的 Cloudflare Worker。
+6. Worker 在 Upstash Redis 读取并更新该 UID 的连续打卡状态，再通过 WxPusher 回复结果。
 
-## 架构概述
+## 架构图
 
 ```text
-GitHub Actions（每天 08:00，北京时间）
-              |
-              v
-       scripts/main.py
-              |
-       随机数 < 0.5 ?
-          /           \
-         v             v
- Pexels 真实图库   Pollinations.ai
-         \             /
-          v           v
-       图片 URL 获取与校验
-              |
-              v
-   WxPusher HTML 图片消息（零文字）
-              |
-              v
-            微信用户
+模块 A：定时单向推送
+GitHub Actions (UTC 00:00 = 北京 08:00)
+  -> daily_push.py
+  -> 50% Lorem Picsum / 50% Pollinations.ai
+  -> WxPusher
+  -> 用户客户端
+
+模块 B：状态记录与互动打卡
+用户回复“打卡”
+  -> WxPusher 上行消息回调
+  -> Cloudflare Worker /webhook?token=...
+  -> Upstash Redis: checkin:{UID}
+  -> WxPusher 文本回复：连续练习 N 天
 ```
 
-## 配置项
+## 部署配置
 
-| 环境变量 | 必填 | 说明 |
-| --- | --- | --- |
-| `WXPUSHER_APP_TOKEN` | 是 | WxPusher 应用 AppToken |
-| `WXPUSHER_UIDS` | 是 | 接收者 UID，多个 UID 用逗号分隔 |
-| `PEXELS_API_KEY` | 建议 | Pexels API Key；未配置时自动转 AI 路线 |
-| `POLLINATIONS_API_KEY` | 可选 | Pollinations 接口如要求鉴权时使用 |
-| `FALLBACK_IMAGE_URLS` | 强烈建议 | 公网可访问的默认图片 URL，多个 URL 用逗号分隔 |
-| `POLLINATIONS_BASE_URL` | 可选 | 默认 `https://image.pollinations.ai/prompt` |
-| `IMAGE_WIDTH` / `IMAGE_HEIGHT` | 可选 | 默认均为 `1024` |
+### 模块 A：GitHub Secrets
 
-## 本地运行
+| 名称 | 说明 |
+| --- | --- |
+| `WXPUSHER_APP_TOKEN` | WxPusher 应用 AppToken |
+| `WXPUSHER_UIDS` | 接收图片的 UID，多个以逗号分隔 |
+| `POLLINATIONS_API_KEY` | 可选；Pollinations 要求鉴权时使用 |
 
-```bash
-cd scripts
-python -m pip install -r requirements.txt
-export WXPUSHER_APP_TOKEN="AT_xxx"
-export WXPUSHER_UIDS="UID_xxx"
-export PEXELS_API_KEY="xxx"
-export FALLBACK_IMAGE_URLS="https://example.com/fallback-1.jpg"
-python main.py
+### 模块 B：Cloudflare Worker Secrets
+
+| 名称 | 说明 |
+| --- | --- |
+| `WXPUSHER_APP_TOKEN` | 同一个 WxPusher AppToken |
+| `WXPUSHER_APP_ID` | WxPusher 应用 ID，用于过滤其他应用回调 |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST HTTPS 地址 |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST Token |
+| `WEBHOOK_TOKEN` | 自行生成的随机长字符串；放在回调 URL 的 `token` 查询参数中 |
+
+将 Worker 部署后的地址配置到 WxPusher 应用的“事件回调地址”：
+
+```text
+https://<你的-worker>.<你的-subdomain>.workers.dev/webhook?token=<WEBHOOK_TOKEN>
 ```
-
-## 内容原则
-
-WxPusher 正文只包含一个 HTML `<img>` 标签。图片 URL、提示词、来源和错误日志均不会推送给用户。
