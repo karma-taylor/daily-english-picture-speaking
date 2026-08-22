@@ -1,0 +1,43 @@
+name: Daily English Picture Push
+
+on:
+  schedule:
+    # GitHub Actions Cron 使用 UTC：UTC 00:00 = 北京时间 08:00。
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-daily-image:
+    name: Send one image-only speaking prompt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r scripts/requirements.txt
+
+      - name: Fetch and push image
+        env:
+          WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+          WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          FALLBACK_IMAGE_URLS: ${{ secrets.FALLBACK_IMAGE_URLS }}
+          POLLINATIONS_BASE_URL: ${{ vars.POLLINATIONS_BASE_URL }}
+          IMAGE_WIDTH: "1024"
+          IMAGE_HEIGHT: "1024"
+          LOG_LEVEL: INFO
+        run: python scripts/main.py

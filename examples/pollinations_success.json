@@ -1,0 +1,18 @@
+{
+  "provider": "pollinations.ai",
+  "request": {
+    "method": "GET",
+    "url": "https://image.pollinations.ai/prompt/a%20curious%20fox%20inside%20a%20floating%20library?width=1024&height=1024&seed=123456&model=flux&safe=true",
+    "prompt": "a curious fox inside a floating library, with glowing paper birds, storybook artwork, clear central subject, safe for all audiences, no text",
+    "width": 1024,
+    "height": 1024,
+    "seed": 123456,
+    "model": "flux",
+    "safe": true
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "image/jpeg",
+    "image_url": "https://image.pollinations.ai/prompt/a%20curious%20fox%20inside%20a%20floating%20library?width=1024&height=1024&seed=123456&model=flux&safe=true"
+  }
+}
